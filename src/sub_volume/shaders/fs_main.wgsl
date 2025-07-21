@@ -4,7 +4,7 @@
 fn fs_main(varyings: Varyings) -> FragmentOutput {
 
     // clipping planes
-    {$ include 'pygfx.clipping_planes.wgsl' $}
+        {$ include 'pygfx.clipping_planes.wgsl' $}
 
     // Get size of the volume
     let sizef = vec3<f32>(u_wobject.volume_dimensions);
@@ -40,7 +40,7 @@ fn fs_main(varyings: Varyings) -> FragmentOutput {
     // Decide how many steps to take. If we'd not cul the front faces,
     // that would still happen here because nsteps would be negative.
     let nsteps = i32(-dist / relative_step_size + 0.5);
-    if( nsteps < 1 ) { discard; }
+    if nsteps < 1 { discard; }
 
     // Get starting position and step vector in texture coordinates.
     let start_coord = (front_pos + vec3<f32>(0.5, 0.5, 0.5)) / sizef;
@@ -49,8 +49,33 @@ fn fs_main(varyings: Varyings) -> FragmentOutput {
     // Render
     let render_out = raycast(sizef, nsteps, start_coord, step_coord);
 
+    // render_out.coord is already in data coordinates, so we do not need to scale by sizef.
+    // However, we need to subtract 0.5 to get to the center. When we sample (1,1,1), we are sampling from the corner
+    // of the voxel. Our depth should deal with the center of the voxel, so we subtract half a unit to get to the
+    // center.
+    let data_pos = render_out.coord - vec3<f32>(0.5, 0.5, 0.5);
+    let world_pos = u_wobject.world_transform * vec4<f32>(data_pos, 1.0);
+    let ndc_pos = u_stdinfo.projection_transform * u_stdinfo.cam_transform * world_pos;
+    // ndc_pos.{x, y} contains the ndc pos on the screen, so this should match with the ndc_pos of this fragment shader
+    // invocation. ndc_pos.z contains some distance value? And then ndc_pos.w encodes info about the perspective.
+    // Note that even though we are using homogenous coordinates, w is *not* 1.0 since the projection transform hijacks
+    // it to encode the perspective.
+    // In case we sample from too close to the near plane, w becomes small enough to cause a division by zero.
+    // To avoid this, we clamp w to a minimum of 0.001. I'm not too sure if this is the best way to do this,
+    // but it stays within the intention of the math for the volume renderer. An alternative might be to return the
+    // offset used to sample from the texture, but that would require a different calculation from the current one.
+    let depth: f32 = ndc_pos.z / max(ndc_pos.w, 0.001);
+
+
     // Create fragment output.
     var out: FragmentOutput;
     out.color = render_out.color;
-    return out;
+    out.depth = depth;
+
+    $$ if write_pick
+        // The wobject-id must be 20 bits. In total it must not exceed 64 bits.
+        out.pick = (pick_pack(u32(u_wobject.id), 20) + pick_pack(u32(render_out.coord.x * 16383.0), 14) + pick_pack(u32(render_out.coord.y * 16383.0), 14) + pick_pack(u32(render_out.coord.z * 16383.0), 14));
+        $$ endif
+
+        return out;
 }

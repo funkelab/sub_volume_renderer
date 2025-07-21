@@ -1,5 +1,6 @@
 struct RenderOutput {
     color: vec4<f32>,
+    coord: vec3<f32>,
 };
 
 // most of the LMIP algorithim written by Claude Sonnet 4
@@ -19,6 +20,7 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
     var max_samples_after_threshold = 100000;
     var local_max_sample: vec4<f32> = vec4<f32>(0.0);
     var local_max_offset: vec3<f32>;
+    var local_max_coord: vec3<f32>;
     var local_max_intensity = 0.0;
     var found_significant_value = false;
     var samples_since_threshold = 0;
@@ -29,13 +31,14 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
         let sample = sample_vol(coord, sizef);
         let sample_intensity = length(sample.rgb); // Use RGB magnitude as intensity
 
-        if (!found_significant_value) {
+        if !found_significant_value {
             // Look for first sample above threshold
-            if (sample_intensity >= lmip_threshold) {
+            if sample_intensity >= lmip_threshold {
                 found_significant_value = true;
                 local_max_intensity = sample_intensity;
                 local_max_sample = sample;
                 local_max_offset = offset;
+                local_max_coord = coord;
                 samples_since_threshold = 0;
             }
         } else {
@@ -43,15 +46,15 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
             samples_since_threshold += 1;
 
             // Update local maximum
-            if (sample_intensity > local_max_intensity) {
+            if sample_intensity > local_max_intensity {
                 local_max_intensity = sample_intensity;
                 local_max_sample = sample;
                 local_max_offset = offset;
+                local_max_coord = coord;
             }
 
             // Stop if we've sampled enough after threshold or intensity drops significantly
-            if (samples_since_threshold >= max_samples_after_threshold ||
-                sample_intensity < local_max_intensity * fall_off_factor) {
+            if samples_since_threshold >= max_samples_after_threshold || sample_intensity < local_max_intensity * fall_off_factor {
                 break;
             }
         }
@@ -59,7 +62,7 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
 
     // Create LMIP result - use the actual sample with maximum intensity
     var final_color: vec4<f32>;
-    if (found_significant_value) {
+    if found_significant_value {
         var distance = length(local_max_offset);
         var fog_factor = exp(-fog_density * distance);
         final_color = mix(fog_color, local_max_sample, fog_factor);
@@ -73,14 +76,15 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
     // Move to physical colorspace (linear photon count) so we can do math
     $$ if colorspace == 'srgb'
         let physical_color = srgb2physical(color.rgb);
-    $$ else
+        $$ else
         let physical_color = color.rgb;
-    $$ endif
-    let opacity = color.a * u_material.opacity;
-    let out_color = vec4<f32>(physical_color, opacity);
+        $$ endif
+        let opacity = color.a * u_material.opacity;
+        let out_color = vec4<f32>(physical_color, opacity);
 
     // Produce result
-    var out: RenderOutput;
-    out.color = out_color;
-    return out;
+        var out: RenderOutput;
+        out.color = out_color;
+        out.coord = local_max_coord;
+        return out;
 }
