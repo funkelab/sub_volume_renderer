@@ -15,14 +15,3 @@ fn sample_vol(data_tex_coord: vec3<f32>, sizef: vec3<f32>) -> vec4<f32> {
 
     return result;
 }
-
-//
-// fn sample_vol(
-//     x: world coordinate
-//     // this tells us how to wrap
-//     offset: where it wraps
-//     // defines where the texture is (this is the Roi)
-//     b: start of the texture
-//     size: size of texture
-// ) -> vec4<f32>;
-//
