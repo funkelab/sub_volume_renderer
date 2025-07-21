@@ -13,11 +13,12 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
 
     // Classic LMIP (Local Maximum Intensity Projection) algorithm
     // The minimum intensity threshold to consider a sample significant
-    var lmip_threshold: f32 = 50;
+    var lmip_threshold: f32 = u_material.lmip_threshold;
     // The percent of the local maximum intensity that we consider still significant
-    var fall_off_factor: f32 = 0.2;
+    var lmip_fall_off: f32 = u_material.lmip_fall_off;
     // Number of samples to check for local max
-    var max_samples_after_threshold = 100000;
+    var lmip_max_samples = u_material.lmip_max_samples;
+
     var local_max_sample: vec4<f32> = vec4<f32>(0.0);
     var local_max_offset: vec3<f32>;
     var local_max_coord: vec3<f32>;
@@ -54,7 +55,7 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
             }
 
             // Stop if we've sampled enough after threshold or intensity drops significantly
-            if samples_since_threshold >= max_samples_after_threshold || sample_intensity < local_max_intensity * fall_off_factor {
+            if samples_since_threshold >= lmip_max_samples || sample_intensity < local_max_intensity * lmip_fall_off {
                 break;
             }
         }

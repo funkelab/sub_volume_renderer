@@ -38,7 +38,7 @@ segmentations = np.zeros(scaled_data.shape, dtype=np.uint16)
 
 # create a volume
 volume = SubVolume(
-    SubVolumeMaterial(),
+    SubVolumeMaterial(lmip_threshold=0.5),
     data=scaled_data,
     segmentations=segmentations,
     buffer_shape_in_chunks=(3, 3, 3),

@@ -40,7 +40,7 @@ segmentations = np.zeros(scaled_data.shape, dtype=np.uint16)
 # noinspection PyTypeChecker
 print(np.max(scaled_data))
 volume = SubVolume(
-    SubVolumeMaterial(clim=(0, np.max(scaled_data)), map=gfx.cm.inferno),
+    SubVolumeMaterial(lmip_threshold=50, clim=(0, np.max(scaled_data))),
     data=scaled_data,
     segmentations=segmentations,
     buffer_shape_in_chunks=(3, 3, 3),

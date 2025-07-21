@@ -14,7 +14,8 @@ from pygfx.renderers.wgpu import (
 # hard coding the flag.
 from pygfx.renderers.wgpu.shaders.volumeshader import vertex_and_fragment
 
-from ._wobject import SubVolume, SubVolumeMaterial
+from ._material import SubVolumeMaterial
+from ._wobject import SubVolume
 
 register_wgsl_loader("sub_volume", PackageLoader("sub_volume", "shaders"))
 
@@ -61,7 +62,7 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
         self["colorspace"] = wobject.texture.colorspace
         if material.map is not None:
             self["colorspace"] = material.map.texture.colorspace
-        self["prefer_purple_orange"] = wobject.prefer_purple_orange
+        self["prefer_purple_orange"] = material.prefer_purple_orange
 
     def get_bindings(self, wobject, shared):
         material = wobject.material

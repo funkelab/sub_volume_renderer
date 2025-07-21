@@ -1,4 +1,5 @@
-from ._wobject import SubVolume, SubVolumeMaterial
+from ._material import SubVolumeMaterial
+from ._wobject import SubVolume
 from ._wrapping_buffer import WrappingBuffer
 
 # we need to import the shader module so that the shader is registered

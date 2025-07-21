@@ -46,7 +46,17 @@ segmentations_data = segmentations[0, 378, :, :, :].astype(np.uint32)
 # create a volume
 # noinspection PyTypeChecker
 volume = SubVolume(
-    SubVolumeMaterial(clim=(0, np.percentile(scaled_data, 99))),
+    SubVolumeMaterial(
+        lmip_threshold=200,
+        lmip_fall_off=0.5,
+        lmip_max_samples=25,
+        fog_density=10,
+        fog_color=(0, 0, 0),
+        prefer_purple_orange=False,
+        clim=(0, np.percentile(scaled_data, 99)),
+        gamma=1.0,
+        opacity=1.0,
+    ),
     data=scaled_data,
     segmentations=segmentations_data,
     buffer_shape_in_chunks=(3, 3, 3),

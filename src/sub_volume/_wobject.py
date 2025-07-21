@@ -6,11 +6,8 @@ from funlib.geometry import Roi
 from pygfx import WorldObject
 from pygfx.utils.bounds import Bounds
 
+from ._material import SubVolumeMaterial
 from ._wrapping_buffer import WrappingBuffer
-
-
-class SubVolumeMaterial(gfx.VolumeMipMaterial):
-    pass
 
 
 class SubVolume(gfx.Volume):
@@ -28,7 +25,6 @@ class SubVolume(gfx.Volume):
         segmentations: npt.NDArray | zarr.Array,
         buffer_shape_in_chunks: tuple[int, int, int],
         chunk_shape_in_pixels: tuple[int, int, int] | None = None,
-        prefer_purple_orange: bool = False,
     ):
         self.volume_dimensions = data.shape
 
@@ -60,7 +56,6 @@ class SubVolume(gfx.Volume):
             tuple(self.volume_dimensions)[::-1], dtype=np.float32
         )
         self.uniform_buffer.data["max_segmentation_value"] = segmentations.max()
-        self.prefer_purple_orange = prefer_purple_orange
 
     @property
     def texture(self) -> gfx.Texture:
