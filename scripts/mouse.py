@@ -33,12 +33,16 @@ data = zarr.open_array("/nrs/funke/data/lightsheet/160315_mouse/160315.zarr/raw"
 scaled_data = data[100, 0, :, :, :]
 scaled_data = scaled_data.astype(np.float32)
 
+# create zero-filled segmentations (not used in this demo)
+segmentations = np.zeros(scaled_data.shape, dtype=np.uint16)
+
 # create a volume
 # noinspection PyTypeChecker
 print(np.max(scaled_data))
 volume = SubVolume(
     SubVolumeMaterial(clim=(0, np.max(scaled_data)), map=gfx.cm.inferno),
     data=scaled_data,
+    segmentations=segmentations,
     buffer_shape_in_chunks=(3, 3, 3),
     # scaled_data is an ndarray now, so we need to provide chunk shape manually
     chunk_shape_in_pixels=data.chunks[2:],

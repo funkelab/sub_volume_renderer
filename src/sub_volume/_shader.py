@@ -61,6 +61,7 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
         self["colorspace"] = wobject.texture.colorspace
         if material.map is not None:
             self["colorspace"] = material.map.texture.colorspace
+        self["prefer_purple_orange"] = wobject.prefer_purple_orange
 
     def get_bindings(self, wobject, shared):
         material = wobject.material
@@ -93,6 +94,17 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
         bindings.append(
             wgpu.Binding(
                 "t_ring_buffer", "texture/auto", t_ring_buffer, vertex_and_fragment
+            )
+        )
+
+        # segmentations ring buffer
+        t_segmentations_ring_buffer = wgpu.GfxTextureView(wobject.segmentations_texture)
+        bindings.append(
+            wgpu.Binding(
+                "t_segmentations_ring_buffer",
+                "texture/auto",
+                t_segmentations_ring_buffer,
+                vertex_and_fragment,
             )
         )
 

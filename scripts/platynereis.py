@@ -32,16 +32,23 @@ scene.add(gfx.AmbientLight())
 data = zarr.open_array(
     "/nrs/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/raw"
 )
+segmentations = zarr.open_array(
+    "/nrs/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/segmentation"
+)
 # data is stored as [channel, t, z, y, x]
 scaled_data = data[0, 378, :, :, :]
 scaled_data[:25, :25, :25] = 1.0
 scaled_data = scaled_data.astype(np.float32)
 
+# segmentations should match the data slice dimensions
+segmentations_data = segmentations[0, 378, :, :, :].astype(np.uint32)
+
 # create a volume
 # noinspection PyTypeChecker
 volume = SubVolume(
-    SubVolumeMaterial(clim=(0, np.percentile(scaled_data, 99)), map=gfx.cm.inferno),
+    SubVolumeMaterial(clim=(0, np.percentile(scaled_data, 99))),
     data=scaled_data,
+    segmentations=segmentations_data,
     buffer_shape_in_chunks=(3, 3, 3),
     # scaled_data is an ndarray now, so we need to provide chunk shape manually
     chunk_shape_in_pixels=data.chunks[2:],

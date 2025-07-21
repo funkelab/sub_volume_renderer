@@ -1,6 +1,9 @@
 struct RenderOutput {
-    color: vec4<f32>,
+    found: bool,
+    color: vec3<f32>,
     coord: vec3<f32>,
+    offset: vec3<f32>,
+    segmentation: u32,
 };
 
 // most of the LMIP algorithim written by Claude Sonnet 4
@@ -8,9 +11,6 @@ struct RenderOutput {
 fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: vec3<f32>) -> RenderOutput {
     let nstepsf = f32(nsteps);
 
-    // Fog parameters
-    var fog_density: f32 = 9;
-    var fog_color = vec4<f32>(0.5, 0.5, 0.5, 1.0);
     // Classic LMIP (Local Maximum Intensity Projection) algorithm
     // The minimum intensity threshold to consider a sample significant
     var lmip_threshold: f32 = 50;
@@ -60,31 +60,26 @@ fn raycast(sizef: vec3<f32>, nsteps: i32, start_coord: vec3<f32>, step_coord: ve
         }
     }
 
-    // Create LMIP result - use the actual sample with maximum intensity
-    var final_color: vec4<f32>;
+    // The fragment shader should check if we set out.found before doing any operations
+    // If out.found is false, the other fields will just be the default values.
+    var out: RenderOutput;
     if found_significant_value {
-        var distance = length(local_max_offset);
-        var fog_factor = exp(-fog_density * distance);
-        final_color = mix(fog_color, local_max_sample, fog_factor);
+        // Colormapping
+        let color = sampled_value_to_color(local_max_sample);
+        // Move to physical colorspace (linear photon count) so we can do math
+        $$ if colorspace == 'srgb'
+            let physical_color = srgb2physical(color.rgb);
+            $$ else
+            let physical_color = color.rgb;
+            $$ endif
+
+            out.found = true;
+            out.color = physical_color;
+            out.coord = local_max_coord;
+            out.offset = local_max_offset;
+            out.segmentation = sample_segmentations_vol(local_max_coord, sizef).r;
     } else {
-        // No significant value found, return transparent
-        final_color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-    }
-
-    // Colormapping
-    let color = sampled_value_to_color(final_color);
-    // Move to physical colorspace (linear photon count) so we can do math
-    $$ if colorspace == 'srgb'
-        let physical_color = srgb2physical(color.rgb);
-        $$ else
-        let physical_color = color.rgb;
-        $$ endif
-        let opacity = color.a * u_material.opacity;
-        let out_color = vec4<f32>(physical_color, opacity);
-
-    // Produce result
-        var out: RenderOutput;
-        out.color = out_color;
-        out.coord = local_max_coord;
+            out.found = false;
+        }
         return out;
-}
+    }

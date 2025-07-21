@@ -17,6 +17,7 @@ class SubVolume(gfx.Volume):
     uniform_type = dict(
         WorldObject.uniform_type,
         volume_dimensions="3xf4",
+        max_segmentation_value="u4",
     )
     material: SubVolumeMaterial
 
@@ -24,8 +25,10 @@ class SubVolume(gfx.Volume):
         self,
         material: SubVolumeMaterial,
         data: npt.NDArray | zarr.Array,
+        segmentations: npt.NDArray | zarr.Array,
         buffer_shape_in_chunks: tuple[int, int, int],
         chunk_shape_in_pixels: tuple[int, int, int] | None = None,
+        prefer_purple_orange: bool = False,
     ):
         self.volume_dimensions = data.shape
 
@@ -39,6 +42,7 @@ class SubVolume(gfx.Volume):
 
         self.wrapping_buffer = WrappingBuffer(
             backing_data=data,
+            segmentations=segmentations,
             shape_in_chunks=buffer_shape_in_chunks,
             chunk_shape_in_pixels=chunk_shape_in_pixels,
         )
@@ -55,10 +59,16 @@ class SubVolume(gfx.Volume):
         self.uniform_buffer.data["volume_dimensions"] = np.array(
             tuple(self.volume_dimensions)[::-1], dtype=np.float32
         )
+        self.uniform_buffer.data["max_segmentation_value"] = segmentations.max()
+        self.prefer_purple_orange = prefer_purple_orange
 
     @property
     def texture(self) -> gfx.Texture:
         return self.wrapping_buffer.texture
+
+    @property
+    def segmentations_texture(self) -> gfx.Texture:
+        return self.wrapping_buffer.segmentations_texture
 
     def center_on_position(
         self,

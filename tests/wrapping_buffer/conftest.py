@@ -4,6 +4,10 @@ from funlib.geometry import Coordinate
 
 from sub_volume._wrapping_buffer import WrappingBuffer
 
+# For these wrapping buffer tests, we use zero-filled segmentation arrays
+# since we are only testing the buffer management functionality and not
+# segmentation-specific features.
+
 
 @pytest.fixture
 def chunk_size():
@@ -22,5 +26,10 @@ def backing_data():
 
 
 @pytest.fixture
-def buffer(backing_data, chunk_size, buffer_chunks):
-    return WrappingBuffer(backing_data, buffer_chunks, chunk_size)
+def segmentations(backing_data):
+    return np.zeros(backing_data.shape, dtype=np.uint16)
+
+
+@pytest.fixture
+def buffer(backing_data, segmentations, chunk_size, buffer_chunks):
+    return WrappingBuffer(backing_data, segmentations, buffer_chunks, chunk_size)

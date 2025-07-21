@@ -11,14 +11,20 @@ from sub_volume import WrappingBuffer
 def boundary_buffer():
     """Create a buffer with smaller dimensions for boundary testing."""
     backing_data = np.arange(16 * 16 * 16, dtype=np.uint16).reshape((16, 16, 16))
-    return WrappingBuffer(backing_data, Coordinate((2, 2, 2)), Coordinate((4, 4, 4)))
+    segmentations = np.zeros(backing_data.shape, dtype=np.uint16)
+    return WrappingBuffer(
+        backing_data, segmentations, Coordinate((2, 2, 2)), Coordinate((4, 4, 4))
+    )
 
 
 @pytest.fixture
 def large_boundary_buffer():
     """Create a buffer with larger dimensions for extensive boundary testing."""
     backing_data = np.arange(32 * 32 * 32, dtype=np.uint16).reshape((32, 32, 32))
-    return WrappingBuffer(backing_data, Coordinate((3, 3, 3)), Coordinate((8, 8, 8)))
+    segmentations = np.zeros(backing_data.shape, dtype=np.uint16)
+    return WrappingBuffer(
+        backing_data, segmentations, Coordinate((3, 3, 3)), Coordinate((8, 8, 8))
+    )
 
 
 def test_load_roi_extending_beyond_positive_boundary(boundary_buffer):

@@ -18,6 +18,7 @@ class WrappingBuffer:
     def __init__(
         self,
         backing_data: npt.NDArray,
+        segmentations: npt.NDArray,
         shape_in_chunks: tuple[int, int, int] | Coordinate,
         chunk_shape_in_pixels: tuple[int, int, int] | Coordinate = None,
     ):
@@ -25,12 +26,15 @@ class WrappingBuffer:
         Args:
             backing_data (npt.NDArray):
                 The source data (numpy or zarr).
+            segmentations (npt.NDArray):
+                The segmentation data (numpy or zarr).
             shape_in_chunks (tuple[int, int, int] or Coordinate):
                 The shape of the wrapping buffer in chunks.
             chunk_shape_in_pixels (tuple[int, int, int] or Coordinate, optional):
                 The shape of a chunk in pixels. If not provided, it will be inferred from the backing array.
         """
         self.backing_data = backing_data
+        self.segmentations = segmentations
         self.shape_in_chunks = Coordinate(shape_in_chunks)
         self.chunk_shape_in_pixels = Coordinate(chunk_shape_in_pixels)
         self.shape_in_pixels = self.shape_in_chunks * self.chunk_shape_in_pixels
@@ -38,6 +42,12 @@ class WrappingBuffer:
         # noinspection PyTypeChecker
         self.texture = gfx.Texture(
             data=np.zeros(self.shape_in_pixels, dtype=backing_data.dtype),
+            dim=3,
+        )
+
+        # noinspection PyTypeChecker
+        self.segmentations_texture = gfx.Texture(
+            data=np.zeros(self.shape_in_pixels, dtype=segmentations.dtype),
             dim=3,
         )
 
@@ -239,15 +249,21 @@ class WrappingBuffer:
 
         # Read from backing array (may return smaller shape than requested if partially out-of-bounds)
         data = self.backing_data[src_slices]
+        segmentation_data = self.segmentations[src_slices]
         actual_shape = data.shape
 
         # Adjust destination slices to match actual data shape
         actual_buffer_roi_in_pixels = Roi(buffer_roi_in_pixels.offset, actual_shape)
         dst_slices = roi_to_slices(actual_buffer_roi_in_pixels)
 
-        # Write to texture with adjusted slices
+        # Write to both textures with adjusted slices
         self.texture.data[dst_slices] = data
         self.texture.update_range(
+            actual_buffer_roi_in_pixels.offset, actual_buffer_roi_in_pixels.shape
+        )
+
+        self.segmentations_texture.data[dst_slices] = segmentation_data
+        self.segmentations_texture.update_range(
             actual_buffer_roi_in_pixels.offset, actual_buffer_roi_in_pixels.shape
         )
 

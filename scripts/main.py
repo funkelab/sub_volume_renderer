@@ -33,10 +33,14 @@ scaled_data = np.linspace(1 / 128, 1, 128)[:, None, None] * np.ones((128, 4, 8))
 scaled_data[0, :, :] = 1.0
 scaled_data = scaled_data.astype(np.float32)
 
+# create zero-filled segmentations (not used in this demo)
+segmentations = np.zeros(scaled_data.shape, dtype=np.uint16)
+
 # create a volume
 volume = SubVolume(
     SubVolumeMaterial(),
     data=scaled_data,
+    segmentations=segmentations,
     buffer_shape_in_chunks=(3, 3, 3),
     chunk_shape_in_pixels=(2, 2, 2),
 )
