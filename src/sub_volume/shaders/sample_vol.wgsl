@@ -6,7 +6,7 @@ fn sample_vol(data_tex_coord: vec3<f32>, sizef: vec3<f32>) -> vec4<f32> {
     let shape = u_wrapping_buffer.current_logical_shape_in_pixels;
 
     let in_bounds = all(offset <= vec3<i32>(data_coord)) && all(vec3<i32>(data_coord) < offset + shape);
-    if (!in_bounds) {
+    if !in_bounds {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 

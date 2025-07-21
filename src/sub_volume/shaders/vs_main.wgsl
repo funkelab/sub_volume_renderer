@@ -1,5 +1,5 @@
 struct VertexInput {
-    @builtin(vertex_index) vertex_index : u32,
+    @builtin(vertex_index) vertex_index: u32,
 };
 
 
