@@ -1,7 +1,7 @@
 import numpy as np
 import pygfx as gfx
+import tensorstore as ts
 import wgpu
-import zarr
 from rendercanvas.auto import RenderCanvas, loop
 
 from sub_volume import SubVolume, SubVolumeMaterial
@@ -29,24 +29,57 @@ scene.add(background)
 scene.add(gfx.AmbientLight())
 
 # noinspection SpellCheckingInspection
-data = zarr.open_array("/nrs/funke/data/lightsheet/160315_mouse/160315.zarr/raw")
-scaled_data = data[100, 0, :, :, :]
+data = ts.open(
+    spec={
+        "driver": "zarr",
+        "kvstore": "file:///nrs/funke/data/lightsheet/160315_mouse/160315.zarr/raw",
+    }
+).result()
+scaled_data = data[100, 0, 180:565, 300:2010, 350:]
 scaled_data = scaled_data.astype(np.float32)
+data_chunks = scaled_data.chunk_layout.read_chunk.shape
+print(data_chunks)
 
-# create zero-filled segmentations (not used in this demo)
-segmentations = np.zeros(scaled_data.shape, dtype=np.uint16)
+segmentations = ts.open(
+    spec={
+        "driver": "zarr",
+        "kvstore": "file:///nrs/funke/data/lightsheet/160315_mouse/160315.zarr/segmentation",
+    }
+).result()
+scaled_segmentations = segmentations[100, 0, 180:565, 300:2010, 350:]
+scaled_segmentations = scaled_segmentations.astype(np.uint32)
+segmentations_chunks = scaled_data.chunk_layout.read_chunk.shape
 
 # create a volume
 # noinspection PyTypeChecker
-print(np.max(scaled_data))
 volume = SubVolume(
-    SubVolumeMaterial(lmip_threshold=50, clim=(0, np.max(scaled_data))),
+    SubVolumeMaterial(
+        lmip_threshold=150,
+        clim=(47, 135),
+        lmip_fall_off=0.5,
+        lmip_max_samples=25,
+        fog_density=0.1,
+        fog_color=(0, 0, 0),
+        colors=[
+            (0.0, 1, 1),
+            (0.1, 1, 1),
+            (0.2, 1, 1),
+            (0.3, 1, 1),
+            (0.4, 1, 1),
+            (0.5, 1, 1),
+            (0.6, 1, 1),
+            (0.7, 1, 1),
+            (0.8, 1, 1),
+            (0.9, 1, 1),
+        ],
+    ),
     data=scaled_data,
-    segmentations=segmentations,
-    buffer_shape_in_chunks=(4, 4, 4),
-    # scaled_data is an ndarray now, so we need to provide chunk shape manually
-    chunk_shape_in_pixels=data.chunks[2:],
+    segmentations=scaled_segmentations,
+    buffer_shape_in_chunks=(6, 6, 6),
+    chunk_shape_in_pixels=(53, 143, 143),
 )
+
+
 volume.world.position = 0, 0, 0
 volume.world.scale_z = 6
 scene.add(volume)
