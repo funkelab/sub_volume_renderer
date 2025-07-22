@@ -239,18 +239,26 @@ class WrappingBuffer:
         # Check for empty ROI
         if logical_roi_in_pixels.empty or buffer_roi_in_pixels.empty:
             return
-        src_slices = roi_to_slices(logical_roi_in_pixels)
 
-        # Read from backing array (may return smaller shape than requested if partially out-of-bounds)
-        data = self.backing_data[src_slices]
-        segmentation_data = self.segmentations[src_slices]
-        actual_shape = data.shape
-
-        # Adjust destination slices to match actual data shape
-        actual_buffer_roi_in_pixels = Roi(buffer_roi_in_pixels.offset, actual_shape)
+        # Ensure we are only loading the portion within the backing data
+        loadable_logical_roi_in_pixels = Roi(
+            shape=self.backing_data.shape, offset=(0, 0, 0)
+        ).intersect(logical_roi_in_pixels)
+        if loadable_logical_roi_in_pixels.empty:
+            return
+        # Shrink our destination Roi to match the shape
+        actual_buffer_roi_in_pixels = Roi(
+            offset=buffer_roi_in_pixels.offset,
+            shape=loadable_logical_roi_in_pixels.shape,
+        )
+        src_slices = roi_to_slices(loadable_logical_roi_in_pixels)
         dst_slices = roi_to_slices(actual_buffer_roi_in_pixels)
 
-        # Write to both textures with adjusted slices
+        # All the data here should be readable
+        data = self.backing_data[src_slices]
+        segmentation_data = self.segmentations[src_slices]
+
+        # Write to both textures
         self.texture.data[dst_slices] = np.array(data, dtype=np.float32)
         self.texture.update_range(
             actual_buffer_roi_in_pixels.offset, actual_buffer_roi_in_pixels.shape
