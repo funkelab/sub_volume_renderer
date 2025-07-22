@@ -28,6 +28,7 @@ main = "python scripts/main.py"
 numpy = ">=2.3.0,<3"
 zarr = ">=3.0.8,<4"
 pygfx = ">=0.12.0,<0.13"
+tensorstore = ">=0.1.65,<0.2"
 
 [tool.pixi.feature.test.dependencies]
 pytest = ">=8.4.1,<9.0"

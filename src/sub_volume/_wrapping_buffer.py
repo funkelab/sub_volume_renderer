@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 import pygfx as gfx
+import tensorstore as ts
 from funlib.geometry import Coordinate, Roi
 
 
@@ -251,12 +252,22 @@ class WrappingBuffer:
             offset=buffer_roi_in_pixels.offset,
             shape=loadable_logical_roi_in_pixels.shape,
         )
-        src_slices = roi_to_slices(loadable_logical_roi_in_pixels)
+        if isinstance(self.backing_data, ts.TensorStore):
+            src_slices = roi_to_slices(
+                loadable_logical_roi_in_pixels + Coordinate(self.backing_data.origin)
+            )
+        else:
+            src_slices = roi_to_slices(loadable_logical_roi_in_pixels)
         dst_slices = roi_to_slices(actual_buffer_roi_in_pixels)
 
         # All the data here should be readable
         data = self.backing_data[src_slices]
+        # we need to explicitly read the data if it's a tensorstore
+        if isinstance(data, ts.TensorStore):
+            data = data.read().result()
         segmentation_data = self.segmentations[src_slices]
+        if isinstance(segmentation_data, ts.TensorStore):
+            segmentation_data = segmentation_data.read().result()
 
         # Write to both textures
         self.texture.data[dst_slices] = np.array(data, dtype=np.float32)
