@@ -41,13 +41,13 @@ class WrappingBuffer:
 
         # noinspection PyTypeChecker
         self.texture = gfx.Texture(
-            data=np.zeros(self.shape_in_pixels, dtype=backing_data.dtype),
+            data=np.zeros(self.shape_in_pixels, np.float32),
             dim=3,
         )
 
         # noinspection PyTypeChecker
         self.segmentations_texture = gfx.Texture(
-            data=np.zeros(self.shape_in_pixels, dtype=segmentations.dtype),
+            data=np.zeros(self.shape_in_pixels, np.uint32),
             dim=3,
         )
 
@@ -251,12 +251,14 @@ class WrappingBuffer:
         dst_slices = roi_to_slices(actual_buffer_roi_in_pixels)
 
         # Write to both textures with adjusted slices
-        self.texture.data[dst_slices] = data
+        self.texture.data[dst_slices] = np.array(data, dtype=np.float32)
         self.texture.update_range(
             actual_buffer_roi_in_pixels.offset, actual_buffer_roi_in_pixels.shape
         )
 
-        self.segmentations_texture.data[dst_slices] = segmentation_data
+        self.segmentations_texture.data[dst_slices] = np.array(
+            segmentation_data, dtype=np.uint32
+        )
         self.segmentations_texture.update_range(
             actual_buffer_roi_in_pixels.offset, actual_buffer_roi_in_pixels.shape
         )
