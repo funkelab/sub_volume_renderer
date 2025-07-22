@@ -14,7 +14,6 @@ class SubVolume(gfx.Volume):
     uniform_type = dict(
         WorldObject.uniform_type,
         volume_dimensions="3xf4",
-        max_segmentation_value="u4",
     )
     material: SubVolumeMaterial
 
@@ -55,7 +54,6 @@ class SubVolume(gfx.Volume):
         self.uniform_buffer.data["volume_dimensions"] = np.array(
             tuple(self.volume_dimensions)[::-1], dtype=np.float32
         )
-        self.uniform_buffer.data["max_segmentation_value"] = segmentations.max()
 
     @property
     def texture(self) -> gfx.Texture:

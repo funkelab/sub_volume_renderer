@@ -11,6 +11,13 @@ class SubVolumeMaterial(gfx.VolumeMipMaterial):
         lmip_max_samples="i4",
         fog_density="f4",
         fog_color="3xf4",
+        color_count="u4",
+        # IMPORTANT NOTE
+        # wgpu expects each 3xf4 to be padded to 16 bytes, which pygfx will do if we pass in 3xf4 normally
+        # however, when we pass in an array of n*3xf4, pygfx does NOT end up padding the vectors!
+        # to get around this, we just use an array of n*4xf4 and ignore the last component.
+        # all inputs are still expected to be 3-component tuples! this is just a lie we tell pygfx.
+        colors="0*4xf4",
     )
 
     def __init__(
@@ -20,7 +27,7 @@ class SubVolumeMaterial(gfx.VolumeMipMaterial):
         lmip_max_samples: int = 10,
         fog_density: float = 0.5,
         fog_color: tuple[float, float, float] = (0.5, 0.5, 0.5),
-        prefer_purple_orange: bool = False,
+        colors: list[tuple[float, float, float]] | None = None,
         clim: tuple[float, float] = (0, 1),
         gamma: float = 1.0,
         opacity: float = 1.0,
@@ -38,7 +45,14 @@ class SubVolumeMaterial(gfx.VolumeMipMaterial):
         self.lmip_max_samples = lmip_max_samples
         self.fog_density = fog_density
         self.fog_color = fog_color
-        self.prefer_purple_orange = prefer_purple_orange
+        if colors is None:
+            colors = [
+                (0.0, 1.0, 1.0),
+                (0.25, 1.0, 1.0),
+                (0.5, 1.0, 1.0),
+                (0.75, 1.0, 1.0),
+            ]
+        self.colors = colors
 
     @property
     def lmip_threshold(self) -> float:
@@ -97,4 +111,43 @@ class SubVolumeMaterial(gfx.VolumeMipMaterial):
         if np.any(fog_color < 0) or np.any(fog_color > 1):
             raise ValueError("fog_color values must be in the range [0, 1]")
         self.uniform_buffer.data["fog_color"] = fog_color
+        self.uniform_buffer.update_full()
+
+    @property
+    def _color_count(self) -> float:
+        return self.uniform_buffer.data["color_count"]
+
+    @_color_count.setter
+    def _color_count(self, value: int) -> None:
+        self.uniform_buffer.data["color_count"] = int(value)
+        self.uniform_buffer.update_full()
+
+    @property
+    def colors(self) -> list[tuple[float, float, float]]:
+        # noinspection PyTypeChecker
+        return [
+            tuple(float(f) for f in plane.flat)
+            for plane in self.uniform_buffer.data["colors"]
+        ]
+
+    @colors.setter
+    def colors(self, colors: list[tuple[float, float, float]]):
+        if not isinstance(colors, (tuple, list)):
+            raise TypeError("Colors must be a list.")
+        colors2 = []
+        for color in colors:
+            if isinstance(color, (tuple, list)) and len(color) == 3:
+                # note that we need to add in an extra alpha component to get a 4xf4 vector!
+                # this is because pygfx doesn't pad the 3xf4 vectors in arrays properly!
+                # see the note on uniform_type above.
+                colors2.append((*color, 1))
+            else:
+                # Error
+                raise TypeError(f"Each color must be an hsv tuple, not {color}")
+
+        # Apply
+        self._set_size_of_uniform_array("colors", len(colors2))
+        self._color_count = len(colors2)
+        for i in range(len(colors2)):
+            self.uniform_buffer.data["colors"][i] = colors2[i]
         self.uniform_buffer.update_full()

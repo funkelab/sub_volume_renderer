@@ -72,8 +72,7 @@ fn fs_main(varyings: Varyings) -> FragmentOutput {
         let depth: f32 = ndc_pos.z / max(ndc_pos.w, 0.001);
 
         let i = render_out.segmentation;
-        let n = u_wobject.max_segmentation_value;
-        let hsv: vec3<f32> = vec3<f32>(sample_hs_color(i, n), render_out.color.r);
+        let hsv: vec3<f32> = vec3<f32>(sample_hs_color(i), render_out.color.r);
         let rgb: vec3<f32> = hsv_to_rgb(hsv);
 
         let fog_density: f32 = u_material.fog_density;

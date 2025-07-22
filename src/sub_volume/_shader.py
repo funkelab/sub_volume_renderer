@@ -62,7 +62,6 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
         self["colorspace"] = wobject.texture.colorspace
         if material.map is not None:
             self["colorspace"] = material.map.texture.colorspace
-        self["prefer_purple_orange"] = material.prefer_purple_orange
 
     def get_bindings(self, wobject, shared):
         material = wobject.material
