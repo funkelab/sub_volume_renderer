@@ -3,6 +3,7 @@ import pygfx as gfx
 import wgpu
 import zarr
 from rendercanvas.auto import RenderCanvas, loop
+from skimage.measure import regionprops
 
 from sub_volume import SubVolume, SubVolumeMaterial
 
@@ -30,10 +31,10 @@ scene.add(gfx.AmbientLight())
 
 # noinspection SpellCheckingInspection
 data = zarr.open_array(
-    "/nrs/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/raw"
+    "/Volumes/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/raw"
 )
 segmentations = zarr.open_array(
-    "/nrs/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/segmentation"
+    "/Volumes/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/segmentation"
 )
 # data is stored as [channel, t, z, y, x]
 scaled_data = data[0, 378, :, :, :]
@@ -55,7 +56,7 @@ volume = SubVolume(
         prefer_purple_orange=False,
         clim=(0, np.percentile(scaled_data, 99)),
         gamma=1.0,
-        opacity=1.0,
+        opacity=0.5,
     ),
     data=scaled_data,
     segmentations=segmentations_data,
@@ -64,8 +65,22 @@ volume = SubVolume(
     chunk_shape_in_pixels=data.chunks[2:],
 )
 volume.world.position = 0, 0, 0
-volume.world.scale_z = 6
 scene.add(volume)
+
+for region in regionprops(segmentations_data):
+    geom = gfx.sphere_geometry(0.5)
+    material = gfx.MeshBasicMaterial(color=(1, 1, 1, 1))
+    mesh = gfx.Mesh(geom, material)
+    pixel_loc = np.array([*region.centroid[::-1], 1])
+    world_loc = volume.world.matrix @ pixel_loc
+    world_loc = tuple(world_loc[:3])
+    mesh.world.position = world_loc
+    mesh.world.z *= 6
+
+    scene.add(mesh)
+
+
+volume.world.scale_z = 6
 
 
 @canvas.request_draw

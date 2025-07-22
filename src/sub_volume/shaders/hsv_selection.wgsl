@@ -13,7 +13,8 @@ fn sample_hs_color(i: u32, n: u32) -> vec2<f32> {
         h = i_f / n_f;
         $$ endif
 
-        let s: f32 = 0.1 + 0.5 * (i_f % 2) + 0.4 * i_f / n_f;
+    // let s: f32 = 0.1 + 0.5 * (i_f % 2) + 0.4 * i_f / n_f;
+        let s: f32 = 1.0;
         return vec2<f32>(h, s);
 }
 
