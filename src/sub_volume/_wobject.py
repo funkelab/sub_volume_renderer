@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 import pygfx as gfx
 import zarr
-from funlib.geometry import Roi
+from funlib.geometry import Coordinate, Roi
 from pygfx import WorldObject
 from pygfx.utils.bounds import Bounds
 
@@ -79,7 +79,9 @@ class SubVolume(gfx.Volume):
                  If not passed, the size will be chosen to max out the available space in the wrapping buffer.
         """
         if size is None:
-            size = self.wrapping_buffer.shape_in_pixels
+            size = (
+                self.wrapping_buffer.shape_in_chunks - Coordinate(1, 1, 1)
+            ) * self.wrapping_buffer.chunk_shape_in_pixels
 
         # convert the world position to our local space using the inverse world matrix
         # we need to attach and then remove the homogeneous coordinate to play nice with the matrix multiplication

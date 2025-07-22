@@ -41,7 +41,7 @@ volume = SubVolume(
     SubVolumeMaterial(lmip_threshold=0.5),
     data=scaled_data,
     segmentations=segmentations,
-    buffer_shape_in_chunks=(3, 3, 3),
+    buffer_shape_in_chunks=(4, 4, 4),
     chunk_shape_in_pixels=(2, 2, 2),
 )
 volume.world.position = 0, 0, 0

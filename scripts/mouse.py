@@ -43,7 +43,7 @@ volume = SubVolume(
     SubVolumeMaterial(lmip_threshold=50, clim=(0, np.max(scaled_data))),
     data=scaled_data,
     segmentations=segmentations,
-    buffer_shape_in_chunks=(3, 3, 3),
+    buffer_shape_in_chunks=(4, 4, 4),
     # scaled_data is an ndarray now, so we need to provide chunk shape manually
     chunk_shape_in_pixels=data.chunks[2:],
 )

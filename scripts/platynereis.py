@@ -70,7 +70,7 @@ volume = SubVolume(
     ),
     data=scaled_data,
     segmentations=segmentations_data,
-    buffer_shape_in_chunks=(3, 3, 3),
+    buffer_shape_in_chunks=(4, 4, 4),
     # scaled_data is an ndarray now, so we need to provide chunk shape manually
     chunk_shape_in_pixels=data.chunks[2:],
 )

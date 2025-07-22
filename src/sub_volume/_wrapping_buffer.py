@@ -88,22 +88,16 @@ class WrappingBuffer:
         self.uniform_buffer.update_full()
 
     def get_snapped_roi_in_pixels(self, logical_roi_in_pixels: Roi) -> Roi:
-        # Snap to chunk bounds (grow)
-        # this checks that the total Roi size fits within the buffer
-        snapped_roi = logical_roi_in_pixels.snap_to_grid(
-            voxel_size=self.chunk_shape_in_pixels, mode="grow"
-        )
-
         data_shape = self.backing_data.shape
         data_roi_shape_in_pixels = Roi((0, 0, 0), data_shape)
 
-        # by taking the intersection and then growing to the grid again, we remove any chunks that
-        # are entirely outside the backing data. note that the new resulting snapped_roi will still partially
-        # overlap with the backing data and could contain out of bounds data.
-        snapped_roi = snapped_roi.intersect(data_roi_shape_in_pixels)
-        if snapped_roi.empty:
-            return snapped_roi
-        snapped_roi = snapped_roi.snap_to_grid(
+        intersected_roi_in_pixels = logical_roi_in_pixels.intersect(
+            data_roi_shape_in_pixels
+        )
+        if intersected_roi_in_pixels.empty:
+            return intersected_roi_in_pixels
+
+        snapped_roi = intersected_roi_in_pixels.snap_to_grid(
             voxel_size=self.chunk_shape_in_pixels, mode="grow"
         )
         return snapped_roi
