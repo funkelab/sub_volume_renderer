@@ -40,7 +40,7 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
         self["mode"] = "mip"
         # Set image format
         self["climcorrection"] = ""
-        fmt = to_texture_format(wobject.texture.format)
+        fmt = to_texture_format(wobject.textures[0].format)
         if "norm" in fmt or "float" in fmt:
             self["img_format"] = "f32"
             if "unorm" in fmt:
@@ -59,9 +59,12 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
         self["img_nchannels"] = len(fmt) - len(fmt.lstrip("rgba"))
 
         # Colorspace
-        self["colorspace"] = wobject.texture.colorspace
+        self["colorspace"] = wobject.textures[0].colorspace
         if material.map is not None:
             self["colorspace"] = material.map.texture.colorspace
+
+        # Multi-scale support
+        self["num_scales"] = len(wobject.wrapping_buffers)
 
     def get_bindings(self, wobject, shared):
         material = wobject.material
@@ -70,43 +73,37 @@ class SubVolumeShader(wgpu.shaders.volumeshader.VolumeRayShader):
             wgpu.Binding("u_stdinfo", "buffer/uniform", shared.uniform_buffer),
             wgpu.Binding("u_wobject", "buffer/uniform", wobject.uniform_buffer),
             wgpu.Binding("u_material", "buffer/uniform", material.uniform_buffer),
-            wgpu.Binding(
-                "u_wrapping_buffer",
-                "buffer/uniform",
-                wobject.wrapping_buffer.uniform_buffer,
-            ),
         ]
 
-        # our ring buffer. iffy on how the sampler should work, but in theory the only place where interpolation matters
-        # would be in the boundary where the ring buffer in a single dimension ends. still, we only use textureLoad and
-        # don't use the sampler in the shader yet.
-        t_ring_buffer = wgpu.GfxTextureView(wobject.texture)
-        s_ring_buffer = wgpu.GfxSampler(
-            # material.interpolation,
-            "nearest",
-            "repeat",
-        )
-        bindings.append(
-            wgpu.Binding(
-                "s_ring_buffer", "sampler/filtering", s_ring_buffer, "FRAGMENT"
+        # Bind all scale levels
+        for i, buffer in enumerate(wobject.wrapping_buffers):
+            # Uniform buffer for this scale
+            bindings.append(
+                wgpu.Binding(
+                    f"u_wrapping_buffer_{i}",
+                    "buffer/uniform",
+                    buffer.uniform_buffer,
+                )
             )
-        )
-        bindings.append(
-            wgpu.Binding(
-                "t_ring_buffer", "texture/auto", t_ring_buffer, vertex_and_fragment
-            )
-        )
 
-        # segmentations ring buffer
-        t_segmentations_ring_buffer = wgpu.GfxTextureView(wobject.segmentations_texture)
-        bindings.append(
-            wgpu.Binding(
-                "t_segmentations_ring_buffer",
-                "texture/auto",
-                t_segmentations_ring_buffer,
-                vertex_and_fragment,
+            # Data texture for this scale
+            t_scale = wgpu.GfxTextureView(buffer.texture)
+            bindings.append(
+                wgpu.Binding(
+                    f"t_scale_{i}", "texture/auto", t_scale, vertex_and_fragment
+                )
             )
-        )
+
+            # Segmentations texture for this scale
+            t_segmentations_scale = wgpu.GfxTextureView(buffer.segmentations_texture)
+            bindings.append(
+                wgpu.Binding(
+                    f"t_segmentations_scale_{i}",
+                    "texture/auto",
+                    t_segmentations_scale,
+                    vertex_and_fragment,
+                )
+            )
 
         if material.map is not None:
             bindings.extend(self.define_img_colormap(material.map))

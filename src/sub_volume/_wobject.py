@@ -20,27 +20,75 @@ class SubVolume(gfx.Volume):
     def __init__(
         self,
         material: SubVolumeMaterial,
-        data: npt.NDArray | zarr.Array,
-        segmentations: npt.NDArray | zarr.Array,
-        buffer_shape_in_chunks: tuple[int, int, int],
-        chunk_shape_in_pixels: tuple[int, int, int] | None = None,
+        data_segmentation_pairs: list[
+            tuple[npt.NDArray | zarr.Array, npt.NDArray | zarr.Array]
+        ],
+        buffer_shape_in_chunks: list[tuple[int, int, int]],
+        chunk_shape_in_pixels: list[tuple[int, int, int]] | None = None,
     ):
-        self.volume_dimensions = data.shape
+        # Use the first (highest resolution) data for base volume dimensions
+        base_data = data_segmentation_pairs[0][0]
+        self.volume_dimensions = base_data.shape
+        num_scales = len(data_segmentation_pairs)
 
-        if chunk_shape_in_pixels is None and hasattr(data, "chunks"):
-            chunk_shape_in_pixels = data.chunks
-        elif chunk_shape_in_pixels is None:
-            raise ValueError(
-                "if chunk_shape_in_pixels is not provided, data must have a 'chunks' attribute"
+        # Handle per-scale or uniform buffer configurations
+        if isinstance(buffer_shape_in_chunks, tuple):
+            # Single configuration for all scales
+            buffer_shapes = [buffer_shape_in_chunks] * num_scales
+        else:
+            # Per-scale configurations
+            buffer_shapes = buffer_shape_in_chunks
+            if len(buffer_shapes) != num_scales:
+                raise ValueError(
+                    f"buffer_shape_in_chunks list length ({len(buffer_shapes)}) must match number of scales ({num_scales})"
+                )
+
+        # Handle per-scale or uniform chunk configurations
+        if chunk_shape_in_pixels is None:
+            # Try to infer from first data array
+            if hasattr(base_data, "chunks"):
+                chunk_shapes = [base_data.chunks] * num_scales
+            else:
+                raise ValueError(
+                    "if chunk_shape_in_pixels is not provided, base data must have a 'chunks' attribute"
+                )
+        elif isinstance(chunk_shape_in_pixels, tuple):
+            # Single configuration for all scales
+            chunk_shapes = [chunk_shape_in_pixels] * num_scales
+        else:
+            # Per-scale configurations
+            chunk_shapes = chunk_shape_in_pixels
+            if len(chunk_shapes) != num_scales:
+                raise ValueError(
+                    f"chunk_shape_in_pixels list length ({len(chunk_shapes)}) must match number of scales ({num_scales})"
+                )
+
+        # Validate chunk shapes match data dimensions
+        for i, (scale_data, _) in enumerate(data_segmentation_pairs):
+            if len(chunk_shapes[i]) != scale_data.ndim:
+                raise ValueError(
+                    f"chunk_shape_in_pixels[{i}] length must match data dimensions"
+                )
+
+        # Create multiple WrappingBuffers for each scale level
+        self.wrapping_buffers = []
+        for i, (scale_data, scale_segmentations) in enumerate(data_segmentation_pairs):
+            # Calculate scale factor for same-sized voxels
+            # For voxels to appear same size: lower resolution needs smaller coordinate scaling
+            # Scale 0 (full res): scale_factor = 1.0
+            # Scale 1 (half res): scale_factor = 0.5 (sample at half coordinates)
+            scale_factor = tuple(
+                float(scale_data.shape[j]) / float(base_data.shape[j]) for j in range(3)
             )
-        assert len(chunk_shape_in_pixels) == data.ndim
 
-        self.wrapping_buffer = WrappingBuffer(
-            backing_data=data,
-            segmentations=segmentations,
-            shape_in_chunks=buffer_shape_in_chunks,
-            chunk_shape_in_pixels=chunk_shape_in_pixels,
-        )
+            buffer = WrappingBuffer(
+                backing_data=scale_data,
+                segmentations=scale_segmentations,
+                shape_in_chunks=buffer_shapes[i],
+                chunk_shape_in_pixels=chunk_shapes[i],
+                scale_factor=scale_factor,
+            )
+            self.wrapping_buffers.append(buffer)
 
         geometry = gfx.box_geometry(*self.volume_dimensions)
         super().__init__(
@@ -56,17 +104,19 @@ class SubVolume(gfx.Volume):
         )
 
     @property
-    def texture(self) -> gfx.Texture:
-        return self.wrapping_buffer.texture
+    def textures(self) -> list[gfx.Texture]:
+        """Return all scale level textures."""
+        return [buffer.texture for buffer in self.wrapping_buffers]
 
     @property
-    def segmentations_texture(self) -> gfx.Texture:
-        return self.wrapping_buffer.segmentations_texture
+    def segmentations_textures(self) -> list[gfx.Texture]:
+        """Return all scale level segmentations textures."""
+        return [buffer.segmentations_texture for buffer in self.wrapping_buffers]
 
     def center_on_position(
         self,
         position: tuple[float, float, float],
-        size: tuple[int, int, int] | None = None,
+        sizes: list[tuple[int, int, int]] | None = None,
     ):
         """
         Center the sub volume on a given position in world coordinates.
@@ -78,10 +128,16 @@ class SubVolume(gfx.Volume):
                 The size of the sub volume to load, as a tuple of (width, height, depth).
                  If not passed, the size will be chosen to max out the available space in the wrapping buffer.
         """
-        if size is None:
-            size = (
-                self.wrapping_buffer.shape_in_chunks - Coordinate(1, 1, 1)
-            ) * self.wrapping_buffer.chunk_shape_in_pixels
+        if sizes is None:
+            sizes = [
+                (wrapping_buffer.shape_in_chunks - Coordinate(1, 1, 1))
+                * wrapping_buffer.chunk_shape_in_pixels
+                for wrapping_buffer in self.wrapping_buffers
+            ]
+        if len(sizes) != len(self.wrapping_buffers):
+            raise ValueError(
+                f"sizes list length ({len(sizes)}) must match number of scales ({len(self.wrapping_buffers)})"
+            )
 
         # convert the world position to our local space using the inverse world matrix
         # we need to attach and then remove the homogeneous coordinate to play nice with the matrix multiplication
@@ -89,14 +145,20 @@ class SubVolume(gfx.Volume):
             :3
         ]
         camera_data_pos = camera_data_pos[::-1]
-        logical_roi = Roi(
-            tuple(int(c - s // 2) for c, s in zip(camera_data_pos, size)),
-            size,
-        )
-        # do we really need this check if load_logical_roi does the check internally?
-        # inclined to keep since the internal check is an implementation detail
-        if self.wrapping_buffer.can_load_logical_roi(logical_roi):
-            self.wrapping_buffer.load_logical_roi(logical_roi)
+        logical_rois = [
+            Roi(
+                tuple(
+                    int(c * f - s // 2)
+                    for c, s, f in zip(camera_data_pos, size, buffer.scale_factor[::-1])
+                ),
+                size,
+            )
+            for size, buffer in zip(sizes, self.wrapping_buffers)
+        ]
+        # Update all wrapping buffers with scale-appropriate ROIs
+        for buffer, logical_roi in zip(self.wrapping_buffers, logical_rois):
+            if buffer.can_load_logical_roi(logical_roi):
+                buffer.load_logical_roi(logical_roi)
 
     def _get_bounds_from_geometry(self):
         if self._bounds_geometry is not None:

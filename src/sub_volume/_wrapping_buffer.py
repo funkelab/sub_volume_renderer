@@ -14,6 +14,7 @@ class WrappingBuffer:
     uniform_type = dict(
         current_logical_offset_in_pixels="3xi4",
         current_logical_shape_in_pixels="3xi4",
+        scale_factor="3xf4",
     )
 
     def __init__(
@@ -22,6 +23,7 @@ class WrappingBuffer:
         segmentations: npt.NDArray,
         shape_in_chunks: tuple[int, int, int] | Coordinate,
         chunk_shape_in_pixels: tuple[int, int, int] | Coordinate = None,
+        scale_factor: tuple[float, float, float] = (1.0, 1.0, 1.0),
     ):
         """
         Args:
@@ -33,11 +35,15 @@ class WrappingBuffer:
                 The shape of the wrapping buffer in chunks.
             chunk_shape_in_pixels (tuple[int, int, int] or Coordinate, optional):
                 The shape of a chunk in pixels. If not provided, it will be inferred from the backing array.
+            scale_factor (tuple[float, float, float] or Coordinate, optional):
+                The scale factor for this level relative to the base resolution. Defaults to (1.0, 1.0, 1.0).
         """
         self.backing_data = backing_data
         self.segmentations = segmentations
         self.shape_in_chunks = Coordinate(shape_in_chunks)
         self.chunk_shape_in_pixels = Coordinate(chunk_shape_in_pixels)
+        # Store scale_factor as raw float tuple to avoid Coordinate truncation
+        self.scale_factor = tuple(float(x) for x in scale_factor)
         self.shape_in_pixels = self.shape_in_chunks * self.chunk_shape_in_pixels
 
         # noinspection PyTypeChecker
@@ -57,6 +63,13 @@ class WrappingBuffer:
         self.uniform_buffer = gfx.Buffer(
             gfx.utils.array_from_shadertype(self.uniform_type), force_contiguous=True
         )
+
+        # initialize scale_factor in uniform buffer (with Fortran order reversal)
+        self.uniform_buffer.data["scale_factor"] = np.array(
+            self.scale_factor[::-1], dtype=np.float32
+        )
+        self.uniform_buffer.update_full()
+
         # this will fill our uniform buffer with data
         self._current_logical_roi_in_pixels = None
         self._current_logical_roi_in_chunks: Roi | None = None

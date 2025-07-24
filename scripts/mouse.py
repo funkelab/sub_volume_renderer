@@ -35,10 +35,15 @@ data = ts.open(
         "kvstore": "file:///nrs/funke/data/lightsheet/160315_mouse/160315.zarr/raw",
     }
 ).result()
-scaled_data = data[100, 0, 180:565, 300:2010, 350:]
-scaled_data = scaled_data.astype(np.float32)
-data_chunks = scaled_data.chunk_layout.read_chunk.shape
-print(data_chunks)
+scaled_data_0 = data[100, 0, 180:565, 300:2010, 350:]
+scaled_data_0 = scaled_data_0.astype(np.float32)
+scaled_data_chunks_0 = scaled_data_0.chunk_layout.read_chunk.shape
+
+scaled_data_1 = scaled_data_0[::2, ::2, ::2]
+scaled_data_chunks_1 = scaled_data_1.chunk_layout.read_chunk.shape
+
+scaled_data_2 = scaled_data_1[::2, ::2, ::2]
+scaled_data_chunks_2 = scaled_data_2.chunk_layout.read_chunk.shape
 
 segmentations = ts.open(
     spec={
@@ -46,9 +51,15 @@ segmentations = ts.open(
         "kvstore": "file:///nrs/funke/data/lightsheet/160315_mouse/160315.zarr/segmentation",
     }
 ).result()
-scaled_segmentations = segmentations[100, 0, 180:565, 300:2010, 350:]
-scaled_segmentations = scaled_segmentations.astype(np.uint32)
-segmentations_chunks = scaled_data.chunk_layout.read_chunk.shape
+scaled_segmentations_0 = segmentations[100, 0, 180:565, 300:2010, 350:]
+scaled_segmentations_0 = scaled_segmentations_0.astype(np.uint32)
+scaled_segmentations_chunks_0 = (53, 143, 143)
+
+scaled_segmentations_1 = scaled_segmentations_0[::2, ::2, ::2]
+scaled_segmentations_chunks_1 = scaled_data_chunks_1
+
+scaled_segmentations_2 = scaled_segmentations_1[::2, ::2, ::2]
+scaled_segmentations_chunks_2 = scaled_data_chunks_2
 
 # create a volume
 # noinspection PyTypeChecker
@@ -61,22 +72,22 @@ volume = SubVolume(
         fog_density=0.1,
         fog_color=(0, 0, 0),
         colors=[
-            (0.0, 1, 1),
-            (0.1, 1, 1),
-            (0.2, 1, 1),
-            (0.3, 1, 1),
-            (0.4, 1, 1),
-            (0.5, 1, 1),
-            (0.6, 1, 1),
-            (0.7, 1, 1),
-            (0.8, 1, 1),
-            (0.9, 1, 1),
+            (0.0, 1.0, 1.0),
+            (0.33, 1.0, 1.0),
+            (0.66, 1.0, 1.0),
         ],
     ),
-    data=scaled_data,
-    segmentations=scaled_segmentations,
-    buffer_shape_in_chunks=(6, 6, 6),
-    chunk_shape_in_pixels=(53, 143, 143),
+    data_segmentation_pairs=[
+        (scaled_data_0, scaled_segmentations_0),
+        (scaled_data_1, scaled_segmentations_1),
+        (scaled_data_2, scaled_segmentations_2),
+    ],
+    chunk_shape_in_pixels=[
+        scaled_data_chunks_0,
+        scaled_data_chunks_1,
+        scaled_data_chunks_2,
+    ],
+    buffer_shape_in_chunks=[(2, 2, 2), (2, 2, 2), (2, 2, 2)],
 )
 
 
