@@ -1,7 +1,7 @@
 import numpy as np
 import pygfx as gfx
-import tensorstore as ts
 import wgpu
+import zarr
 from rendercanvas.auto import RenderCanvas, loop
 
 from sub_volume import SubVolume, SubVolumeMaterial
@@ -29,37 +29,21 @@ scene.add(background)
 scene.add(gfx.AmbientLight())
 
 # noinspection SpellCheckingInspection
-data = ts.open(
-    spec={
-        "driver": "zarr",
-        "kvstore": "file:///nrs/funke/data/lightsheet/160315_mouse/160315.zarr/raw",
-    }
-).result()
-scaled_data_0 = data[100, 0, 180:565, 300:2010, 350:]
-scaled_data_0 = scaled_data_0.astype(np.float32)
-scaled_data_chunks_0 = scaled_data_0.chunk_layout.read_chunk.shape
+raw_group = zarr.open_group("/nrs/funke/data/sub_volume/mouse/raw.zarr")
+labels_group = zarr.open_group("/nrs/funke/data/sub_volume/mouse/labels.zarr")
 
-scaled_data_1 = scaled_data_0[::2, ::2, ::2]
-scaled_data_chunks_1 = scaled_data_1.chunk_layout.read_chunk.shape
+# Load multiscale data (keep as zarr arrays)
+scaled_data_0 = raw_group["scale0"]
+scaled_data_1 = raw_group["scale1"]
+scaled_data_2 = raw_group["scale2"]
+scaled_data_3 = raw_group["scale3"]
+scaled_data_4 = raw_group["scale4"]
 
-scaled_data_2 = scaled_data_1[::2, ::2, ::2]
-scaled_data_chunks_2 = scaled_data_2.chunk_layout.read_chunk.shape
-
-segmentations = ts.open(
-    spec={
-        "driver": "zarr",
-        "kvstore": "file:///nrs/funke/data/lightsheet/160315_mouse/160315.zarr/segmentation",
-    }
-).result()
-scaled_segmentations_0 = segmentations[100, 0, 180:565, 300:2010, 350:]
-scaled_segmentations_0 = scaled_segmentations_0.astype(np.uint32)
-scaled_segmentations_chunks_0 = (53, 143, 143)
-
-scaled_segmentations_1 = scaled_segmentations_0[::2, ::2, ::2]
-scaled_segmentations_chunks_1 = scaled_data_chunks_1
-
-scaled_segmentations_2 = scaled_segmentations_1[::2, ::2, ::2]
-scaled_segmentations_chunks_2 = scaled_data_chunks_2
+scaled_segmentations_0 = labels_group["scale0"]
+scaled_segmentations_1 = labels_group["scale1"]
+scaled_segmentations_2 = labels_group["scale2"]
+scaled_segmentations_3 = labels_group["scale3"]
+scaled_segmentations_4 = labels_group["scale4"]
 
 # create a volume
 # noinspection PyTypeChecker
@@ -73,21 +57,33 @@ volume = SubVolume(
         fog_color=(0, 0, 0),
         colors=[
             (0.0, 1.0, 1.0),
-            (0.33, 1.0, 1.0),
-            (0.66, 1.0, 1.0),
+            (0.20, 1.0, 1.0),
+            (0.40, 1.0, 1.0),
+            (0.60, 1.0, 1.0),
+            (0.86, 1.0, 1.0),
         ],
     ),
     data_segmentation_pairs=[
         (scaled_data_0, scaled_segmentations_0),
         (scaled_data_1, scaled_segmentations_1),
         (scaled_data_2, scaled_segmentations_2),
+        (scaled_data_3, scaled_segmentations_3),
+        (scaled_data_4, scaled_segmentations_4),
     ],
     chunk_shape_in_pixels=[
-        scaled_data_chunks_0,
-        scaled_data_chunks_1,
-        scaled_data_chunks_2,
+        (16, 16, 16),
+        (16, 16, 16),
+        (16, 16, 16),
+        (16, 16, 16),
+        (16, 16, 16),
     ],
-    buffer_shape_in_chunks=[(2, 2, 2), (2, 2, 2), (2, 2, 2)],
+    buffer_shape_in_chunks=[
+        (4, 4, 4),
+        (4, 4, 4),
+        (4, 4, 4),
+        (4, 4, 4),
+        (4, 4, 4),
+    ],
 )
 
 

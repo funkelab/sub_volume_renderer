@@ -29,19 +29,17 @@ scene.add(background)
 scene.add(gfx.AmbientLight())
 
 # noinspection SpellCheckingInspection
-data = zarr.open_array(
-    "/nrs/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/raw"
-)
-segmentations = zarr.open_array(
-    "/nrs/funke/data/lightsheet/130312_platynereis/13-03-12.zarr/segmentation"
-)
-# data is stored as [channel, t, z, y, x]
-scaled_data = data[0, 378, :, :, :]
-scaled_data[:25, :25, :25] = 1.0
-scaled_data = scaled_data.astype(np.float32)
+raw_group = zarr.open_group("/nrs/funke/data/sub_volume/platynereis/raw.zarr")
+labels_group = zarr.open_group("/nrs/funke/data/sub_volume/platynereis/labels.zarr")
 
-# segmentations should match the data slice dimensions
-segmentations_data = segmentations[0, 378, :, :, :].astype(np.uint32)
+# Load multiscale data (keep as zarr arrays)
+scaled_data_0 = raw_group["scale0"]
+scaled_data_1 = raw_group["scale1"]
+scaled_data_2 = raw_group["scale2"]
+
+scaled_segmentations_0 = labels_group["scale0"]
+scaled_segmentations_1 = labels_group["scale1"]
+scaled_segmentations_2 = labels_group["scale2"]
 
 # create a volume
 # noinspection PyTypeChecker
@@ -64,15 +62,21 @@ volume = SubVolume(
             (0.8, 1, 1),
             (0.9, 1, 1),
         ],
-        clim=(0, np.percentile(scaled_data, 99)),
+        clim=(0, np.percentile(scaled_data_0, 99)),
         gamma=1.0,
         opacity=1.0,
     ),
-    data=scaled_data,
-    segmentations=segmentations_data,
-    buffer_shape_in_chunks=(4, 4, 4),
-    # scaled_data is an ndarray now, so we need to provide chunk shape manually
-    chunk_shape_in_pixels=data.chunks[2:],
+    data_segmentation_pairs=[
+        (scaled_data_0, scaled_segmentations_0),
+        (scaled_data_1, scaled_segmentations_1),
+        (scaled_data_2, scaled_segmentations_2),
+    ],
+    chunk_shape_in_pixels=[
+        (16, 16, 16),  # Using actual zarr chunk size
+        (16, 16, 16),
+        (16, 16, 16),
+    ],
+    buffer_shape_in_chunks=[(2, 2, 2), (2, 2, 2), (2, 2, 2)],
 )
 volume.world.position = 0, 0, 0
 volume.world.scale_z = 6
